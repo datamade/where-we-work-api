@@ -1,0 +1,5 @@
+DB_CONN='postgresql://user:password@hostname:port_number/dbname'
+SECRET_KEY = 'super secret key'
+REDIS_QUEUE_KEY = 'where-we-work'
+SENTRY_DSN = ''
+
