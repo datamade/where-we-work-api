@@ -105,14 +105,35 @@ def load_area(fpath):
     return None
 
 if __name__ == "__main__":
-    import sys
-    basedir = sys.argv[1]
-    create_tables()
-    os.path.walk(basedir, iterfiles, None)
-   #with psycopg2.connect(DB_CONN_STR) as conn:
-   #    with conn.cursor() as curs:
-   #        for year in range(2002,2012):
-   #            for jt in range(6):
-   #                job_type = 'jt{0}'.format(str(jt).zfill(2))
-   #                curs.execute('CREATE INDEX ON origin_dest_{0}_{1}(h_geocode)'.format(year, job_type))
-   #                curs.execute('CREATE INDEX ON origin_dest_{0}_{1}(w_geocode)'.format(year, job_type))
+   #import sys
+   #basedir = sys.argv[1]
+   #create_tables()
+   #os.path.walk(basedir, iterfiles, None)
+    for year in range(2002,2012):
+        for jt in range(6):
+            with psycopg2.connect(DB_CONN_STR) as conn:
+                with conn.cursor() as curs:
+                    job_type = 'jt{0}'.format(str(jt).zfill(2))
+                    for tname in ['origin_dest', 'res_area', 'work_area']:
+                        if tname == 'origin_dest':
+                            fields = ['h_geocode', 'w_geocode']
+                        else:
+                            fields = ['geocode', 'segment']
+                        for field in fields:
+                            table = '{tname}_{year}_{job_type}'\
+                                .format(tname=tname, year=year, job_type=job_type)
+                            c = ''' 
+                              CREATE INDEX {table}_{field}_idx ON {table} ({field})
+                            '''.format(table=table, field=field)
+                            try:
+                                curs.execute(c)
+                                conn.commit()
+                            except Exception, e:
+                                print e
+                                conn.rollback()
+                   #curs.execute('CREATE INDEX ON origin_dest_{0}_{1}(h_geocode)'.format(year, job_type))
+                   #curs.execute('CREATE INDEX ON origin_dest_{0}_{1}(w_geocode)'.format(year, job_type))
+                   #curs.execute('CREATE INDEX ON res_area_{0}_{1}(segment)'.format(year, job_type))
+                   #curs.execute('CREATE INDEX ON res_area_{0}_{1}(geocode)'.format(year, job_type))
+                   #curs.execute('CREATE INDEX ON work_area_{0}_{1}(segment)'.format(year, job_type))
+                   #curs.execute('CREATE INDEX ON res_area_{0}_{1}(geocode)'.format(year, job_type))
