@@ -15,7 +15,7 @@ GEO_RANGE = {
 @years.route('/')
 def summary_by_year():
     ''' 
-    Generate a summary by county of statistics by year
+    Generate a summary of statistics by year
     '''
     job_type = request.args.get('job_type', 'jt00')
     years = request.args.get('year_range', '2002,2011')
@@ -69,3 +69,50 @@ def summary_by_year():
     resp = make_response(json.dumps(r))
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+@years.route('/<int:year>/')
+def origin_dest(year):
+    job_type = request.args.get('job_type', 'jt00')
+    years = request.args.get('year_range', '2002,2011')
+    segment = request.args.get('segment', 's000')
+    geography = request.args.get('geography', 'county')
+    char_type = request.args.get('char_type', 'res_area')
+    rows = []
+    '''
+      SELECT 
+        a.total_jobs, 
+        a.county, 
+        b.connected 
+      FROM (
+        SELECT 
+          SUM(total_jobs) as total_jobs, 
+          substr(geocode, 1, 5) AS county 
+        FROM res_area_2002_jt00 
+        WHERE segment = 's000' 
+        GROUP BY county
+      ) AS a 
+      JOIN (
+        SELECT 
+          substr(h_geocode, 1, 5) AS county, 
+          array_agg(DISTINCT substr(w_geocode, 1, 5)) AS connected 
+        FROM origin_dest_2002_jt00 
+        GROUP BY county
+      ) AS b ON a.county = b.county
+    '''
+    r = {
+        'meta': {
+            'status': 'ok',
+            'query': {
+                'job_type': job_type,
+                'years': years,
+                'segment': segment,
+                'char_type': char_type,
+            },
+            'result_count': len(rows)
+        },
+        'objects': rows
+    }
+    resp = make_response(json.dumps(r))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+    

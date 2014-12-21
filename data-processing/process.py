@@ -87,7 +87,11 @@ def load_area(fpath):
             work, home = unicode(row[0][:5]), unicode(row[1][:5])
             if work in COUNTIES or home in COUNTIES:
                 if table_type == 'od':
-                    writer.writerow([row[0], row[1]])
+                    rs = []
+                    for idx, seg in enumerate(SEGMENTS):
+                        i = idx + 2
+                        rs.append([row[0], row[1], row[i], seg, row[-1]])
+                    writer.writerows(rs)
                 else:
                     row.append(segment)
                     writer.writerow(row)
@@ -99,16 +103,17 @@ def load_area(fpath):
         with conn.cursor() as curs:
             try:
                 curs.copy_expert(copy_st, out)
-            except psycopg2.IntegrityError:
+            except psycopg2.IntegrityError, e:
+                print e
                 conn.rollback()
     print 'Loaded {0}'.format(fname)
     return None
 
 if __name__ == "__main__":
-   #import sys
-   #basedir = sys.argv[1]
-   #create_tables()
-   #os.path.walk(basedir, iterfiles, None)
+    import sys
+    basedir = sys.argv[1]
+    create_tables()
+    os.path.walk(basedir, iterfiles, None)
     for year in range(2002,2012):
         for jt in range(6):
             with psycopg2.connect(DB_CONN_STR) as conn:
@@ -116,7 +121,7 @@ if __name__ == "__main__":
                     job_type = 'jt{0}'.format(str(jt).zfill(2))
                     for tname in ['origin_dest', 'res_area', 'work_area']:
                         if tname == 'origin_dest':
-                            fields = ['h_geocode', 'w_geocode']
+                            fields = ['h_geocode', 'w_geocode', 'segment']
                         else:
                             fields = ['geocode', 'segment']
                         for field in fields:

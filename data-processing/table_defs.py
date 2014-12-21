@@ -110,9 +110,12 @@ RES_AREA_CREATE = """
 
 OD_CREATE = """
     CREATE TABLE IF NOT EXISTS origin_dest_{0}_{1} (
-        h_geocode VARCHAR(15) NOT NULL,
         w_geocode VARCHAR(15) NOT NULL,
-        PRIMARY KEY (h_geocode, w_geocode)
+        h_geocode VARCHAR(15) NOT NULL,
+        job_count INTEGER,
+        segment VARCHAR,
+        createdate DATE,
+        PRIMARY KEY (h_geocode, w_geocode, segment)
     )
 """
 
