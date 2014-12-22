@@ -18,12 +18,12 @@ def summary_by_year():
     Generate a summary of statistics by year
     '''
     job_type = request.args.get('job_type', 'jt00')
-    years = request.args.get('year_range', '2002,2011')
+    year_range = request.args.get('year_range', '2002,2011')
     segment = request.args.get('segment', 's000')
     geography = request.args.get('geography', 'county')
     char_type = request.args.get('char_type', 'res_area')
     table_names = []
-    begin_year, end_year = years.split(',')
+    begin_year, end_year = year_range.split(',')
     year_range = range(int(begin_year), int(end_year) + 1)
     geo_range = GEO_RANGE[geography]
     selects = []
@@ -58,7 +58,7 @@ def summary_by_year():
             'status': 'ok',
             'query': {
                 'job_type': job_type,
-                'years': years,
+                'years': year_range,
                 'segment': segment,
                 'char_type': char_type,
             },
@@ -72,39 +72,55 @@ def summary_by_year():
 
 @years.route('/<int:year>/')
 def origin_dest(year):
+    ''' 
+    Origin destination by year
+    '''
     job_type = request.args.get('job_type', 'jt00')
-    years = request.args.get('year_range', '2002,2011')
     segment = request.args.get('segment', 's000')
     geography = request.args.get('geography', 'county')
     char_type = request.args.get('char_type', 'res_area')
+    geo_range = GEO_RANGE[geography]
+    fmt_args = []
+    if char_type == 'res_area':
+        fmt_args.extend(['home', 'work'])
+    else:
+        fmt_args.extend(['work', 'home'])
+    fmt_args.extend([year, job_type] + geo_range)
+    sel = '''
+        SELECT 
+          a.{0}, 
+          array_agg(a.{1}), 
+          array_agg(a.cnt) 
+        FROM (
+          SELECT 
+            substr(h_geocode, {4}, {5}) AS home, 
+            substr(w_geocode, {4}, {5}) AS work, 
+            sum(job_count) AS cnt 
+          FROM origin_dest_{2}_{3} 
+          WHERE segment = :segment 
+          GROUP BY home, work
+        ) AS a 
+        GROUP BY a.{0}
+        '''.format(*fmt_args)
+    sel = text(sel)
+    fields = fmt_args[:2] + ['job_count']
+    results = []
+    with engine.begin() as conn:
+        results = [dict(zip(fields, r)) for r in conn.execute(sel, segment=segment)]
     rows = []
-    '''
-      SELECT 
-        a.total_jobs, 
-        a.county, 
-        b.connected 
-      FROM (
-        SELECT 
-          SUM(total_jobs) as total_jobs, 
-          substr(geocode, 1, 5) AS county 
-        FROM res_area_2002_jt00 
-        WHERE segment = 's000' 
-        GROUP BY county
-      ) AS a 
-      JOIN (
-        SELECT 
-          substr(h_geocode, 1, 5) AS county, 
-          array_agg(DISTINCT substr(w_geocode, 1, 5)) AS connected 
-        FROM origin_dest_2002_jt00 
-        GROUP BY county
-      ) AS b ON a.county = b.county
-    '''
+    for row in results:
+        d = {
+            'origin': row[fields[0]],
+            'counts': {k:v for k,v in zip(row[fields[1]], row[fields[2]])},
+            'total_workers': sum(row[fields[2]]),
+        }
+        rows.append(d)
     r = {
         'meta': {
             'status': 'ok',
             'query': {
                 'job_type': job_type,
-                'years': years,
+                'year': year,
                 'segment': segment,
                 'char_type': char_type,
             },
