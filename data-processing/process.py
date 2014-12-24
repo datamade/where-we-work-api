@@ -113,7 +113,7 @@ def indexes(create=True):
                     job_type = 'jt{0}'.format(str(jt).zfill(2))
                     for tname in ['origin_dest', 'res_area', 'work_area']:
                         if tname == 'origin_dest':
-                            fields = ['h_geocode', 'w_geocode', 'segment']
+                            fields = ['h_geocode', 'w_geocode']
                         else:
                             fields = ['geocode', 'segment']
                         for field in fields:
