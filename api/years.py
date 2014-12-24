@@ -79,6 +79,7 @@ def origin_dest(year):
     segment = request.args.get('segment', 's000')
     geography = request.args.get('geography', 'county')
     char_type = request.args.get('char_type', 'res_area')
+    geocode = request.args.get('geocode')
     geo_range = GEO_RANGE[geography]
     fmt_args = []
     if char_type == 'res_area':
@@ -97,15 +98,31 @@ def origin_dest(year):
             substr(w_geocode, {4}, {5}) AS work, 
             sum({6}) AS cnt 
           FROM origin_dest_{2}_{3} 
-          GROUP BY home, work
-        ) AS a 
-        GROUP BY a.{0}
         '''.format(*fmt_args)
-    sel = text(sel)
+    kwargs = {}
+    if geocode:
+        if fmt_args[0] == 'work':
+            substr = 'substr(w_geocode, {0}, {1})'.format(*geo_range)
+        else:
+            substr = 'substr(h_geocode, {0}, {1})'.format(*geo_range)
+        sel = '''
+        {0} WHERE {1} = :geocode 
+        GROUP BY home, work) AS a
+        GROUP BY a.{2}
+        '''.format(sel, substr, fmt_args[0])
+        sel = text(sel)
+        kwargs = {'geocode': geocode}
+    else:
+        sel = '''
+        {0} GROUP BY home, work) AS a
+        GROUP BY a.{1}
+        '''.format(sel, fmt_args[0])
+        sel = text(sel)
+    print sel
     fields = fmt_args[:2] + ['job_count']
     results = []
     with engine.begin() as conn:
-        results = [dict(zip(fields, r)) for r in conn.execute(sel, segment=segment)]
+        results = [dict(zip(fields, r)) for r in conn.execute(sel, **kwargs)]
     rows = []
     for row in results:
         d = {

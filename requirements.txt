@@ -7,3 +7,6 @@ redis==2.10.3
 xlwt==0.7.5
 raven==5.1.1
 SQLAlchemy==0.9.8
+pyshp==1.2.1
+GeoAlchemy==0.2.4
+shapely==1.5.1

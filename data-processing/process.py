@@ -5,6 +5,12 @@ import os
 from cStringIO import StringIO
 import csv
 import gzip
+from sqlalchemy import create_engine, Table, MetaData, Column, String, Float
+from sqlalchemy.dialects.postgresql import TIMESTAMP
+from geoalchemy2 import Geometry
+from shapely.geometry import MultiPolygon, asShape
+import zipfile
+import shapefile
 
 COUNTIES = [
     '17031', 
@@ -67,6 +73,102 @@ def iterfiles(params, dirname, names):
         fpath = os.path.join(dirname, name)
         if os.path.isfile(fpath) and fpath.endswith('.gz'):
             load_area(fpath)
+        elif os.path.isfile(fpath) and fpath.endswith('.zip'):
+            load_shapes(fpath)
+        else:
+            print "I don't know what to do with {0}".format(fpath)
+
+GEO_TYPE_MAP = {
+    'C': String,
+    'N': Float,
+    'L': Float,
+    'D': TIMESTAMP,
+}
+
+def load_shapes(fpath):
+    content = StringIO()
+    file_contents = open(fpath, 'r')
+    content.write(file_contents.read())
+    content.seek(0)
+    shp = StringIO()
+    dbf = StringIO()
+    shx = StringIO()
+    with zipfile.ZipFile(content, 'r') as f:
+        for name in f.namelist():
+            if name.endswith('.shp'):
+                shp.write(f.read(name))
+            if name.endswith('.shx'):
+                shx.write(f.read(name))
+            if name.endswith('.dbf'):
+                dbf.write(f.read(name))
+    shp.seek(0)
+    shx.seek(0)
+    dbf.seek(0)
+    shape_reader = shapefile.Reader(shp=shp, dbf=dbf, shx=shx)
+    fields = shape_reader.fields[1:]
+    records = shape_reader.shapeRecords()
+    columns = []
+    for field in fields:
+        fname, d_type, f_len, d_len = field
+        col_type = GEO_TYPE_MAP[d_type]
+        kwargs = {}
+        if d_type == 'C':
+            col_type = col_type(f_len)
+        elif d_type == 'N':
+            col_type = col_type(d_len)
+        if fname.lower() == 'geoid10':
+            kwargs['primary_key'] = True
+        columns.append(Column(fname.lower(), col_type, **kwargs))
+    for record in records:
+        geo_type = record.shape.__geo_interface__['type']
+    geo_type = 'MULTIPOLYGON'
+    columns.append(Column('geom', Geometry(geo_type)))
+    conn_str='postgresql+psycopg2://{user}:@{host}:{port}/{name}'\
+        .format(user=DB_USER, host=DB_HOST, port=DB_PORT, name=DB_NAME)
+    metadata = MetaData()
+    engine = create_engine(conn_str, 
+                           convert_unicode=True, 
+                           server_side_cursors=True)
+    table = Table('census_blocks', metadata, *columns)
+    table.create(engine, checkfirst=True)
+
+    ins = table.insert()
+    shp_count = 0
+    values = []
+    for record in records:
+        d = {}
+        for k,v in zip(table.columns.keys(), record.record):
+            d[k] = v
+        geom = asShape(record.shape.__geo_interface__)
+        geom = MultiPolygon([geom])
+        d['geom'] = 'SRID=4326;%s' % geom.wkt
+        values.append(d)
+        shp_count += 1
+        if shp_count % 1000 == 0:
+            # dump 100 shapefile records at a time
+            conn = engine.connect()
+            trans = conn.begin()
+            try:
+                conn.execute(ins, values)
+                trans.commit()
+                print 'Loaded {0} shapes'.format(shp_count)
+            except Exception, e:
+                print e.message
+                trans.rollback()
+            conn.close()
+            values = []
+    # out of the loop -- add the remaining records
+    if (len(values) != 0):
+        conn = engine.connect()
+        trans = conn.begin()
+        try:
+            conn.execute(ins, values)
+            trans.commit()
+            print 'Loaded {0} shapes'.format(shp_count + len(values))
+        except Exception, e:
+            print e.message
+            trans.rollback()
+        conn.close()
 
 def load_area(fpath):
     fname = os.path.basename(fpath)
