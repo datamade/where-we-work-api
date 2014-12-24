@@ -85,7 +85,7 @@ def origin_dest(year):
         fmt_args.extend(['home', 'work'])
     else:
         fmt_args.extend(['work', 'home'])
-    fmt_args.extend([year, job_type] + geo_range)
+    fmt_args.extend([year, job_type] + geo_range + [segment])
     sel = '''
         SELECT 
           a.{0}, 
@@ -95,9 +95,8 @@ def origin_dest(year):
           SELECT 
             substr(h_geocode, {4}, {5}) AS home, 
             substr(w_geocode, {4}, {5}) AS work, 
-            sum(job_count) AS cnt 
+            sum({6}) AS cnt 
           FROM origin_dest_{2}_{3} 
-          WHERE segment = :segment 
           GROUP BY home, work
         ) AS a 
         GROUP BY a.{0}

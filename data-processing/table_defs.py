@@ -112,10 +112,18 @@ OD_CREATE = """
     CREATE TABLE IF NOT EXISTS origin_dest_{0}_{1} (
         w_geocode VARCHAR(15) NOT NULL,
         h_geocode VARCHAR(15) NOT NULL,
-        job_count INTEGER,
-        segment VARCHAR,
+        s000 INTEGER,
+        sa01 INTEGER,
+        sa02 INTEGER,
+        sa03 INTEGER,
+        se01 INTEGER,
+        se02 INTEGER,
+        se03 INTEGER,
+        si01 INTEGER,
+        si02 INTEGER,
+        si03 INTEGER,
         createdate DATE,
-        PRIMARY KEY (h_geocode, w_geocode, segment)
+        PRIMARY KEY (h_geocode, w_geocode)
     )
 """
 

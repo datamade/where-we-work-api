@@ -24,7 +24,7 @@ COUNTIES = [
 ]
 
 DB_USER = 'postgres'
-DB_HOST = 'localhost'
+DB_HOST = '127.0.0.1'
 DB_NAME = 'lodes'
 DB_PORT = '5433'
 DB_CONN_STR = 'host={0} dbname={1} user={2} port={3}'\
@@ -87,11 +87,7 @@ def load_area(fpath):
             work, home = unicode(row[0][:5]), unicode(row[1][:5])
             if work in COUNTIES or home in COUNTIES:
                 if table_type == 'od':
-                    rs = []
-                    for idx, seg in enumerate(SEGMENTS):
-                        i = idx + 2
-                        rs.append([row[0], row[1], row[i], seg, row[-1]])
-                    writer.writerows(rs)
+                    writer.writerow(row)
                 else:
                     row.append(segment)
                     writer.writerow(row)
@@ -109,11 +105,7 @@ def load_area(fpath):
     print 'Loaded {0}'.format(fname)
     return None
 
-if __name__ == "__main__":
-    import sys
-    basedir = sys.argv[1]
-    create_tables()
-    os.path.walk(basedir, iterfiles, None)
+def indexes(create=True):
     for year in range(2002,2012):
         for jt in range(6):
             with psycopg2.connect(DB_CONN_STR) as conn:
@@ -127,18 +119,29 @@ if __name__ == "__main__":
                         for field in fields:
                             table = '{tname}_{year}_{job_type}'\
                                 .format(tname=tname, year=year, job_type=job_type)
-                            c = ''' 
-                              CREATE INDEX {table}_{field}_idx ON {table} ({field})
-                            '''.format(table=table, field=field)
+                            if create:
+                                c = ''' 
+                                  CREATE INDEX {table}_{field}_idx ON {table} ({field})
+                                '''.format(table=table, field=field)
+                            else:
+                                c = '''
+                                  DROP INDEX {table}_{field}_idx
+                                '''.format(table=table, field=field)
                             try:
                                 curs.execute(c)
                                 conn.commit()
+                                print 'created index {table}_{field}_idx'\
+                                    .format(table=table, field=field)
                             except Exception, e:
                                 print e
                                 conn.rollback()
-                   #curs.execute('CREATE INDEX ON origin_dest_{0}_{1}(h_geocode)'.format(year, job_type))
-                   #curs.execute('CREATE INDEX ON origin_dest_{0}_{1}(w_geocode)'.format(year, job_type))
-                   #curs.execute('CREATE INDEX ON res_area_{0}_{1}(segment)'.format(year, job_type))
-                   #curs.execute('CREATE INDEX ON res_area_{0}_{1}(geocode)'.format(year, job_type))
-                   #curs.execute('CREATE INDEX ON work_area_{0}_{1}(segment)'.format(year, job_type))
-                   #curs.execute('CREATE INDEX ON res_area_{0}_{1}(geocode)'.format(year, job_type))
+    
+
+if __name__ == "__main__":
+    import sys
+    arg = sys.argv[1]
+    if os.path.exists(arg):
+        create_tables()
+        os.path.walk(arg, iterfiles, None)
+    else:
+        indexes()
