@@ -1,4 +1,3 @@
-from subprocess import Popen, PIPE
 from table_defs import WORK_AREA_CREATE, RES_AREA_CREATE, OD_CREATE
 import psycopg2
 import os
@@ -237,7 +236,150 @@ def indexes(create=True):
                             except Exception, e:
                                 print e
                                 conn.rollback()
-    
+
+GEO_RANGE = {
+    'county': [1,5],
+    'tract': [1,11],
+}
+
+def create_views():
+    for geography in ['tract', 'county']:
+        geo_range = GEO_RANGE[geography]
+        for char_type in ['res_area', 'work_area']:
+            if char_type == 'res_area':
+                t = 'jobs'
+            else:
+                t = 'workers'
+            for year in range(2002, 2012):
+                stats_view_name = '{0}_by_{1}_{2}'.format(t, geography, year)
+                od_view_name = 'connected_{0}_{1}_{2}'.format(t, geography, year)
+                stats_fmt_args = geo_range + [geography, char_type, year]
+                od_fmt_args = [od_view_name]
+                if t == 'jobs':
+                    groups = ['home', 'work']
+                else:
+                    groups = ['work', 'home']
+                od_fmt_args = od_fmt_args + groups + geo_range + [year]
+                stats = ''' 
+                  CREATE MATERIALIZED VIEW {0} AS (
+                    SELECT w.*
+                    FROM (
+                      SELECT 
+                        SUM(total_jobs) AS total_jobs, 
+                        SUM(age_29_under) AS age_29_under, 
+                        SUM(age_30_54) AS age_30_54, 
+                        SUM(age_55_over) AS age_55_over, 
+                        SUM(earnings_1250_under) AS earnings_1250_under, 
+                        SUM(earnings_1251_3333) AS earnings_1251_3333 , 
+                        SUM(earnings_3333_over) AS earnings_3333_over , 
+                        SUM(cns01) AS cns01, 
+                        SUM(cns02) AS cns02, 
+                        SUM(cns03) AS cns03, 
+                        SUM(cns04) AS cns04, 
+                        SUM(cns05) AS cns05, 
+                        SUM(cns06) AS cns06, 
+                        SUM(cns07) AS cns07, 
+                        SUM(cns08) AS cns08, 
+                        SUM(cns09) AS cns09, 
+                        SUM(cns10) AS cns10, 
+                        SUM(cns11) AS cns11, 
+                        SUM(cns12) AS cns12, 
+                        SUM(cns13) AS cns13, 
+                        SUM(cns14) AS cns14, 
+                        SUM(cns15) AS cns15, 
+                        SUM(cns16) AS cns16, 
+                        SUM(cns17) AS cns17, 
+                        SUM(cns18) AS cns18, 
+                        SUM(cns19) AS cns19, 
+                        SUM(cns20) AS cns20, 
+                        SUM(cr01) AS cr01, 
+                        SUM(cr02) AS cr02, 
+                        SUM(cr03) AS cr03, 
+                        SUM(cr04) AS cr04, 
+                        SUM(cr05) AS cr05, 
+                        SUM(cr07) AS cr07, 
+                        SUM(ct01) AS ct01, 
+                        SUM(ct02) AS ct02, 
+                        SUM(cd01) AS cd01, 
+                        SUM(cd02) AS cd02, 
+                        SUM(cd03) AS cd03, 
+                        SUM(cd04) AS cd04, 
+                        SUM(cs01) AS cs01, 
+                        SUM(cs02) AS cs02,
+                '''.format(stats_view_name) 
+                if char_type == 'work_area':
+                    stats += '''
+                            SUM(cfa01) AS cfa01, 
+                            SUM(cfa02) AS cfa02, 
+                            SUM(cfa03) AS cfa03, 
+                            SUM(cfa04) AS cfa04, 
+                            SUM(cfa05) AS cfa05, 
+                            SUM(cfs01) AS cfs01, 
+                            SUM(cfs02) AS cfs02, 
+                            SUM(cfs03) AS cfs03, 
+                            SUM(cfs04) AS cfs04, 
+                            SUM(cfs05) AS cfs05, 
+                    ''' 
+                stats += '''
+                        substr(geocode, {0}, {1}) as {2} 
+                      from {3}_{4}_jt00 where segment = %(segment)s 
+                      group by {2}
+                    ) AS w
+                  )
+                '''.format(*stats_fmt_args)
+                origin_dest = ''' 
+                  CREATE MATERIALIZED VIEW {0} AS (
+                    SELECT 
+                      a.{1},
+                      array_agg(a.{2}) as connected,
+                      array_agg(a.s000) as s000,
+                      array_agg(a.sa01) as sa01,
+                      array_agg(a.sa02) as sa02,
+                      array_agg(a.sa03) as sa03,
+                      array_agg(a.se01) as se01,
+                      array_agg(a.se02) as se02,
+                      array_agg(a.se03) as se03,
+                      array_agg(a.si01) as si01,
+                      array_agg(a.si02) as si02,
+                      array_agg(a.si03) as si03
+                    FROM (
+                      SELECT 
+                        substr(h_geocode, {3}, {4}) AS home,
+                        substr(w_geocode, {3}, {4}) AS work,
+                        SUM(s000) as s000,
+                        SUM(sa01) as sa01,
+                        SUM(sa02) as sa02,
+                        SUM(sa03) as sa03,
+                        SUM(se01) as se01,
+                        SUM(se02) as se02,
+                        SUM(se03) as se03,
+                        SUM(si01) as si01,
+                        SUM(si02) as si02,
+                        SUM(si03) as si03
+                      FROM origin_dest_{5}_jt00
+                      GROUP BY home, work
+                    ) AS a
+                    GROUP BY a.{1}
+                  )
+                '''.format(*od_fmt_args)
+                with psycopg2.connect(DB_CONN_STR) as conn:
+                    with conn.cursor() as curs:
+                        try:
+                            curs.execute(stats, {'segment': 's000'})
+                            curs.execute(origin_dest)
+                            curs.execute(''' 
+                                CREATE INDEX {0}_{1}_idx ON {0} ({1})
+                            '''.format(stats_view_name, geography))
+                            args = [od_view_name, groups[0]]
+                            curs.execute(''' 
+                              CREATE INDEX {0}_{1}_idx ON {0} ({1})
+                            '''.format(*args))
+                            conn.commit()
+                            print 'created views {0}, {1}'\
+                                .format(stats_view_name, od_view_name)
+                        except Exception, e:
+                            print e
+                            conn.rollback()
 
 if __name__ == "__main__":
     import sys
@@ -245,5 +387,7 @@ if __name__ == "__main__":
     if os.path.exists(arg):
         create_tables()
         os.path.walk(arg, iterfiles, None)
-    else:
+    elif arg == 'indexes':
         indexes()
+    elif arg == 'views':
+        create_views()

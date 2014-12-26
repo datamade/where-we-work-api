@@ -80,46 +80,25 @@ def origin_dest(year):
     geography = request.args.get('geography', 'county')
     char_type = request.args.get('char_type', 'res_area')
     geocode = request.args.get('geocode')
-    geo_range = GEO_RANGE[geography]
-    fmt_args = []
     if char_type == 'res_area':
-        fmt_args.extend(['home', 'work'])
+        geo = 'home'
+        t = 'jobs'
     else:
-        fmt_args.extend(['work', 'home'])
-    fmt_args.extend([year, job_type] + geo_range + [segment])
+        geo = 'work'
+        t = 'workers'
+    fmt_args = [geo, segment, t, geography, year]
     sel = '''
-        SELECT 
-          a.{0}, 
-          array_agg(a.{1}), 
-          array_agg(a.cnt) 
-        FROM (
-          SELECT 
-            substr(h_geocode, {4}, {5}) AS home, 
-            substr(w_geocode, {4}, {5}) AS work, 
-            sum({6}) AS cnt 
-          FROM origin_dest_{2}_{3} 
+        SELECT {0}, connected, {1}
+        FROM connected_{2}_{3}_{4} 
         '''.format(*fmt_args)
     kwargs = {}
     if geocode:
-        if fmt_args[0] == 'work':
-            substr = 'substr(w_geocode, {0}, {1})'.format(*geo_range)
-        else:
-            substr = 'substr(h_geocode, {0}, {1})'.format(*geo_range)
         sel = '''
         {0} WHERE {1} = :geocode 
-        GROUP BY home, work) AS a
-        GROUP BY a.{2}
-        '''.format(sel, substr, fmt_args[0])
-        sel = text(sel)
+        '''.format(sel, geo)
         kwargs = {'geocode': geocode}
-    else:
-        sel = '''
-        {0} GROUP BY home, work) AS a
-        GROUP BY a.{1}
-        '''.format(sel, fmt_args[0])
-        sel = text(sel)
-    print sel
-    fields = fmt_args[:2] + ['job_count']
+    sel = text(sel)
+    fields = [geo, 'connected', segment]
     results = []
     with engine.begin() as conn:
         results = [dict(zip(fields, r)) for r in conn.execute(sel, **kwargs)]
@@ -128,7 +107,7 @@ def origin_dest(year):
         d = {
             'origin': row[fields[0]],
             'counts': {k:v for k,v in zip(row[fields[1]], row[fields[2]])},
-            'total_workers': sum(row[fields[2]]),
+            'total': sum(row[fields[2]]),
         }
         rows.append(d)
     r = {
