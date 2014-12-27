@@ -22,20 +22,24 @@ if __name__ == "__main__":
         home_tracts = set()
         work_tracts = set()
         for tract in res_area.json()['objects']:
-            all_tracts[tract['origin']] = {'traveling-from': tract['counts']}
-            home_tracts.add(tract['origin'])
+            county = tract['origin'][:5]
+            if county in COUNTIES:
+                all_tracts[tract['origin']] = {'traveling-from': tract['counts']}
+                home_tracts.add(tract['origin'])
 
         params['char_type'] = 'work_area'
         work_area = requests.get('{0}/{1}/'.format(ENDPOINT, year), params=params)
         for tract in work_area.json()['objects']:
-            try:
-                all_tracts[tract['origin']]['traveling-to'] = tract['counts']
-            except KeyError:
-                all_tracts[tract['origin']] = {
-                    'traveling-from': {}, 
-                    'traveling-to': tract['counts']
-                }
-            work_tracts.add(tract['origin'])
+            county = tract['origin'][:5]
+            if county in COUNTIES:
+                try:
+                    all_tracts[tract['origin']]['traveling-to'] = tract['counts']
+                except KeyError:
+                    all_tracts[tract['origin']] = {
+                        'traveling-from': {}, 
+                        'traveling-to': tract['counts']
+                    }
+                work_tracts.add(tract['origin'])
         for tract in (home_tracts - work_tracts):
             all_tracts[tract]['traveling-to'] = {}
         for tract, val in all_tracts.items():
@@ -45,10 +49,8 @@ if __name__ == "__main__":
                         key=itemgetter(1), reverse=True)
             outp = OrderedDict([('traveling-to', OrderedDict(tt)), 
                                 ('traveling-from', OrderedDict(tf))])
-            key = bucket.lookup('{0}/{1}.json'.format(year, tract))
-            if not key:
-                key = Key(bucket)
-                key.key = '{0}/{1}.json'.format(year, tract)
+            key = Key(bucket)
+            key.key = '{0}/{1}.json'.format(year, tract)
             key.set_contents_from_string(json.dumps(outp, sort_keys=False))
             key.make_public()
             key.copy(key.bucket, key.name, preserve_acl=True, metadata={'Content-Type': 'application/json'})
