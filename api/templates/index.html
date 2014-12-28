@@ -10,15 +10,48 @@
 {% endblock %}
 {% block content %}
 <div class="row">
-    <div class="col-sm-9">
+    <div class="col-sm-8">
         <div id="map-canvas"></div>
     </div>
-    <div id="info" class="col-sm-3"></div>
+    <div id="info" class="col-sm-4"></div>
 </div>
 {% endblock %}
 {% block extra_javascript %}
 <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/keyMapper.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ejs_production.js') }}"></script>
+<script type="text/EJS" id="accordionTemplate">
+    <h2><%= meta.name %> <span class="label label-default">Total jobs: <%= meta.totals %></span></h2>
+    <div class="panel-group" id="stats-accordion" role="tablist" aria-multiselectable="true">
+    <% $.each(groups, function(i, group){ %>
+        <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="<%= group.name %>-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" data-parent="#stats-accordion" href="#<%= group.name %>"
+                        aria-expanded="true" aria-controls="<%= group.name %>">
+                        <%= group.name %>
+                    </a>
+                </h4>
+            </div>
+            <div id="<%= group.name %>" class="panel-collapse collapse <% if (i != 'age') { %> in<% } %>" role="tabpanel" aria-labelledby="<%= group.name %>-heading">
+                <div class="panel-body">
+                    <table class="table table-condensed">
+                        <tbody>
+                            <% $.each(group.items, function(i, item){ %>
+                                <tr>
+                                    <td><strong><%= item.name %></strong></td>
+                                    <td><%= item.value %></td>
+                                </tr>
+                            <% })%>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+    </div>
+</script>
+
 <script type="text/javascript">
     var map;
     $(document).ready(function(){
@@ -44,7 +77,7 @@
         return {
             weight: 0.5,
             opacity: 0.8,
-            color: 'black',
+            color: 'white',
             fillOpacity: 0.7,
             fillColor: '#ccc'
         }
@@ -52,20 +85,46 @@
 
     function onEach(feature, layer){
         layer.on('click', function(e){
-            map.fitBounds(layer.getBounds());
+            map.fitBounds(this.getBounds());
+            this.setStyle({'weight': 2, 'color': 'black'});
             updateInfo(e.target.feature.properties);
         })
     }
 
     function updateInfo(props){
         // TODO: Make accordion grouping each statistic type for clicked object
+        var groups = {
+            'age': {'name': 'age', 'items': []},
+            'earnings': {'name': 'earnings', 'items': []},
+            'industry': {'name': 'industry', 'items': []},
+            'race': {'name': 'race', 'items': []},
+            'ethnicity': {'name': 'ethnicity', 'items': []},
+            'education': {'name': 'education', 'items': []},
+            'gender': {'name': 'gender', 'items': []}
+        }
+        var meta = {'name': props['name'], 'totals': props['total_jobs']}
+        $.each(props, function(name, value){
+            var keys = keyMapper[name]
+            if (typeof keys !== 'undefined' && keys['group'] !== 'total'){
+                var n = keys['group']
+                groups[n]['items'].push({
+                    'name': keys['name'],
+                    'value': value,
+                })
+            }
+        });
+        var template = $('#accordionTemplate').html()
+        var tpl = new EJS({'text': template});
+        var data = {'groups': groups, 'meta': meta}
+        $('#info').html(tpl.render(data));
+        $('.collapse').collapse()
     }
 
     function getGeoJSON(geo_type, fips, year){
         var url = '/api/geo'
         var params = {}
         if (typeof geo_type == 'undefined'){
-            url += '/county/';
+            url += '/tract/';
         }
         if (typeof fips != 'undefined'){
             url += fips + '/'
