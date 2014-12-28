@@ -6,6 +6,7 @@ from api.years import years
 from api.views import views
 from api.segments import segments
 from api.job_types import job_types
+from api.geo import geo
 from api.redis_session import RedisSessionInterface
 
 try:
@@ -28,5 +29,6 @@ def create_app():
     app.register_blueprint(views)
     app.register_blueprint(segments)
     app.register_blueprint(job_types)
+    app.register_blueprint(geo)
     return app
 

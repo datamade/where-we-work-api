@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Geomancer{% endblock %}
+{% block extra_styles %}
+<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+<style>
+  #map-canvas {
+    height: 600px;
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-sm-9">
+        <div id="map-canvas"></div>
+    </div>
+    <div id="info" class="col-sm-3"></div>
+</div>
+{% endblock %}
+{% block extra_javascript %}
+<script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/keyMapper.js') }}"></script>
+<script type="text/javascript">
+    var map;
+    $(document).ready(function(){
+        map = L.map('map-canvas', {
+            center: [41.83887416186901, -87.87139892578125],
+            zoom: 9,
+            scrollWheelZoom: false
+        });
+        L.tileLayer('http://d.tile.stamen.com/toner/{z}/{x}/{y}.png',{
+            attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
+            detectRetina: true
+        }).addTo(map);
+        $.when(getGeoJSON()).then(
+            function(data){
+                L.geoJson(data, {
+                    style: styleShape,
+                    onEachFeature: onEach
+                }).addTo(map);
+            }
+        )
+    });
+    function styleShape(feature){
+        return {
+            weight: 0.5,
+            opacity: 0.8,
+            color: 'black',
+            fillOpacity: 0.7,
+            fillColor: '#ccc'
+        }
+    }
+
+    function onEach(feature, layer){
+        layer.on('click', function(e){
+            map.fitBounds(layer.getBounds());
+            updateInfo(e.target.feature.properties);
+        })
+    }
+
+    function updateInfo(props){
+        // TODO: Make accordion grouping each statistic type for clicked object
+    }
+
+    function getGeoJSON(geo_type, fips, year){
+        var url = '/api/geo'
+        var params = {}
+        if (typeof geo_type == 'undefined'){
+            url += '/county/';
+        }
+        if (typeof fips != 'undefined'){
+            url += fips + '/'
+        }
+        if (typeof year == 'undefined'){
+            params['year'] = '2011'
+        }
+        return $.getJSON(url, params)
+    }
+</script>
+{% endblock %}
