@@ -42,7 +42,7 @@
                                     <td><strong><%= item.name %></strong></td>
                                     <td><%= item.value %></td>
                                 </tr>
-                            <% })%>
+                            <% }) %>
                         </tbody>
                     </table>
                 </div>
@@ -60,7 +60,7 @@
             zoom: 9,
             scrollWheelZoom: false
         });
-        L.tileLayer('http://d.tile.stamen.com/toner/{z}/{x}/{y}.png',{
+        L.tileLayer('http://{s}.tile.stamen.com/toner/{z}/{x}/{y}.png',{
             attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
             detectRetina: true
         }).addTo(map);
@@ -124,10 +124,12 @@
         var url = '/api/geo'
         var params = {}
         if (typeof geo_type == 'undefined'){
-            url += '/tract/';
+            url += '/county/';
+        } else {
+            url += '/' + geo_type + '/';
         }
         if (typeof fips != 'undefined'){
-            url += fips + '/'
+            params['geoid'] = fips
         }
         if (typeof year == 'undefined'){
             params['year'] = '2011'

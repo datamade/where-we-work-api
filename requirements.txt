@@ -10,3 +10,4 @@ SQLAlchemy==0.9.8
 pyshp==1.2.1
 GeoAlchemy==0.2.4
 shapely==1.5.1
+TileStache==1.49.11

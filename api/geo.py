@@ -27,11 +27,13 @@ def geo_type(geo_type):
     else:
         char_type = request.args.get('char_type', 'res_area')
         year = request.args.get('year', '2011')
+        geoid = request.args.get('geoid')
         if char_type == 'res_area':
             table_name = 'jobs_by_{0}_{1}'.format(geo_type, year)
         else:
             table_name = 'workers_by_{0}_{1}'.format(geo_type, year)
-        sel = text(''' 
+        kwargs = {}
+        sel = ''' 
           SELECT 
             g.name,
             j.*, 
@@ -39,13 +41,16 @@ def geo_type(geo_type):
           FROM {0} AS j
           JOIN {1} AS g
             ON j.{1} = g.geoid
-        '''.format(table_name, geo_type))
+        '''.format(table_name, geo_type)
+        if geoid:
+            sel = '{0} WHERE g.geoid = :geoid'.format(sel)
+            kwargs['geoid'] = geoid
         resp = {
             'type': 'FeatureCollection',
             'features': []
         }
         with engine.begin() as conn:
-            result = conn.execute(sel)
+            result = conn.execute(text(sel), **kwargs)
             fields = result.keys()
             for row in result:
                 vals = row.values()
@@ -58,11 +63,3 @@ def geo_type(geo_type):
     r = make_response(json.dumps(resp, sort_keys=False))
     r.headers['Content-Type'] = 'application/json'
     return r
-
-@geo.route('/<geo_type>/<fips>/')
-def geo_type_fips(geo_type, fips):
-    ''' 
-    Get stats for one geography
-    '''
-    resp = {}
-    return make_response(json.dumps(resp))
