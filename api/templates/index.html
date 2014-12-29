@@ -18,6 +18,7 @@
 {% endblock %}
 {% block extra_javascript %}
 <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/leaflet.utfgrid.js') }}"></script>
 <script src="{{ url_for('static', filename='js/keyMapper.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ejs_production.js') }}"></script>
 <script type="text/EJS" id="accordionTemplate">
@@ -54,6 +55,9 @@
 
 <script type="text/javascript">
     var map;
+    var info;
+    var tiles_endpoint = 'http://127.0.0.1:8080'
+    var shapeGroup = new L.LayerGroup();
     $(document).ready(function(){
         map = L.map('map-canvas', {
             center: [41.83887416186901, -87.87139892578125],
@@ -64,35 +68,75 @@
             attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
             detectRetina: true
         }).addTo(map);
-        $.when(getGeoJSON()).then(
-            function(data){
-                L.geoJson(data, {
-                    style: styleShape,
-                    onEachFeature: onEach
-                }).addTo(map);
+        var blocks_tiles = L.tileLayer(tiles_endpoint + '/census-blocks/{z}/{x}/{y}.png');
+        var blocks_grids = new L.UtfGrid(tiles_endpoint + '/census-blocks-grid/{z}/{x}/{y}.json?callback={cb}', {});
+        var tracts_tiles = L.tileLayer(tiles_endpoint + '/census-tracts/{z}/{x}/{y}.png');
+        var tracts_grids = new L.UtfGrid(tiles_endpoint + '/census-tracts-grid/{z}/{x}/{y}.json?callback={cb}', {});
+        var county_tiles = L.tileLayer(tiles_endpoint + '/counties/{z}/{x}/{y}.png');
+        var county_grids = new L.UtfGrid(tiles_endpoint + '/counties-grid/{z}/{x}/{y}.json?callback={cb}', {});
+        var tileLayers = {
+            'Census blocks': blocks_tiles,
+            'Census tracts': tracts_tiles,
+            'Counties': county_tiles
+        }
+        var gridLayers = {
+            'Census blocks': blocks_grids,
+            'Census tracts': tracts_grids,
+            'Counties': county_grids
+        }
+        var layer_control = L.control.layers({}, tileLayers, {collapsed: false, autoZIndex: true}).addTo(map);
+        map.on('overlayadd', function(e){
+            var grid = gridLayers[e.name];
+            var geo_type = ''
+            if (e.name == 'Counties'){
+                geo_type = 'county'
             }
-        )
+            else if (e.name == 'Census blocks'){
+                geo_type = 'block'
+            }
+            else if (e.name == 'Census tracts'){
+                geo_type = 'tract'
+            }
+            grid.on('click', function(e){
+                var geoid = e.data.geoid;
+                if (typeof geoid === 'undefined'){
+                    geoid = e.data.geoid10
+                }
+                $.when(getGeoJSON(geo_type, geoid)).then(
+                    function(data){
+                        var geo = L.geoJson(data, {
+                            style: styleShape,
+                            onEachFeature: onEach
+                        });
+                        shapeGroup.clearLayers();
+                        shapeGroup.addLayer(geo);
+                        map.fitBounds(geo.getBounds());
+                        shapeGroup.addTo(map);
+                    }
+                )
+            });
+            this.addLayer(grid);
+        });
+        map.on('overlayremove', function(e){
+            shapeGroup.clearLayers();
+            map.removeLayer(gridLayers[e.name]);
+        })
     });
     function styleShape(feature){
         return {
-            weight: 0.5,
+            weight: 1,
             opacity: 0.8,
             color: 'white',
             fillOpacity: 0.7,
-            fillColor: '#ccc'
+            fillColor: '#f00'
         }
     }
 
     function onEach(feature, layer){
-        layer.on('click', function(e){
-            map.fitBounds(this.getBounds());
-            this.setStyle({'weight': 2, 'color': 'black'});
-            updateInfo(e.target.feature.properties);
-        })
+        updateInfo(feature.properties)
     }
 
     function updateInfo(props){
-        // TODO: Make accordion grouping each statistic type for clicked object
         var groups = {
             'age': {'name': 'age', 'items': []},
             'earnings': {'name': 'earnings', 'items': []},
@@ -102,7 +146,11 @@
             'education': {'name': 'education', 'items': []},
             'gender': {'name': 'gender', 'items': []}
         }
-        var meta = {'name': props['name'], 'totals': props['total_jobs']}
+        var name = props['name'];
+        if (typeof name === 'undefined'){
+            name = props['geoid10']
+        }
+        var meta = {'name': name, 'totals': props['total_jobs']}
         $.each(props, function(name, value){
             var keys = keyMapper[name]
             if (typeof keys !== 'undefined' && keys['group'] !== 'total'){
