@@ -58,6 +58,24 @@
     var info;
     var tiles_endpoint = 'http://127.0.0.1:8080'
     var shapeGroup = new L.LayerGroup();
+    var connectedGroup = new L.FeatureGroup();
+    var geo_type = ''
+    var COUNTIES = [
+        '17031',
+        '17111',
+        '17037',
+        '17063',
+        '17093',
+        '17197',
+        '18127',
+        '17097',
+        '17043',
+        '18111',
+        '17089',
+        '18073',
+        '18089',
+        '55059'
+    ]
     $(document).ready(function(){
         map = L.map('map-canvas', {
             center: [41.83887416186901, -87.87139892578125],
@@ -87,7 +105,6 @@
         var layer_control = L.control.layers({}, tileLayers, {collapsed: false, autoZIndex: true}).addTo(map);
         map.on('overlayadd', function(e){
             var grid = gridLayers[e.name];
-            var geo_type = ''
             if (e.name == 'Counties'){
                 geo_type = 'county'
             }
@@ -133,7 +150,31 @@
     }
 
     function onEach(feature, layer){
+        var geoid = feature.properties[geo_type]
+        $.when(getConnected(geoid, geo_type)).then(
+            function(data){
+                connectedGroup.clearLayers()
+                $.each(data.objects, function(i, obj){
+                    $.each(obj.counts, function(fips, count){
+                        if(COUNTIES.indexOf(fips.slice(0, 5)) >= 0){
+                            $.when(getGeoJSON(geo_type, fips)).then(
+                                function(data){
+                                    connectedGroup.addLayer(L.geoJson(data));
+                                }
+                            )
+                        }
+                    })
+                })
+                connectedGroup.addTo(map);
+            }
+        )
         updateInfo(feature.properties)
+    }
+
+    function getConnected(geoid, geo_type){
+        var params = {'geography': geo_type, 'geocode': geoid}
+        var url = '/api/years/2011/'
+        return $.getJSON(url, params)
     }
 
     function updateInfo(props){
