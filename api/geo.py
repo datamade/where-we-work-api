@@ -18,6 +18,68 @@ def geo_summary():
     resp = {}
     return make_response(json.dumps(resp))
 
+@geo.route('/vectors/<geoid>/')
+def vectors(geoid):
+    resp = {}
+    char_type = request.args.get('char_type', 'res_area')
+    year = request.args.get('year', '2011')
+    job_type = request.args.get('job_type', 'jt00')
+    char_type = request.args.get('char_type', 'res_area')
+    table_name = 'origin_dest_{0}_{1}'.format(year, job_type)
+    char_table_name = '{0}_{1}_{2}'.format(char_type, year, job_type)
+    sel = """ 
+        SELECT 
+            j.*,
+            ST_AsGeoJSON(ST_ShortestLine(ST_Centroid(b.geom), ST_Centroid(c.geom))) as line,
+            ST_AsGeoJSON(c.geom) AS origin_geom,
+            c.geoid10 as origin_geocode,
+            ST_AsGeoJSON(b.geom) AS dest_geom
+        FROM (
+            SELECT 
+                geom,
+                geoid10
+            FROM census_blocks 
+            WHERE geoid10 = :geoid
+        ) AS c, 
+        {0} AS o 
+        JOIN census_blocks AS b 
+            ON o.h_geocode = b.geoid10
+        JOIN {1} as j
+            ON o.h_geocode = j.geocode
+        WHERE h_geocode = :geoid
+    """.format(table_name, char_table_name)
+    resp = {
+        "type": "FeatureCollection",
+        "features": []
+    }
+    with engine.begin() as conn:
+        rows = [dict(zip(r.keys(), r.values())) for r in conn.execute(text(sel), geoid=geoid)]
+        for row in rows:
+            feature = {
+                'type': 'Feature',
+                'geometry': json.loads(row['line']),
+                'properties': OrderedDict([(k,v,) for k,v in zip(row.keys(), row.values())])
+            }
+            del feature['properties']['line']
+            del feature['properties']['origin_geom']
+            del feature['properties']['dest_geom']
+            resp['features'].append(feature)
+            feature = {
+                'type': 'Feature',
+                'geometry': json.loads(row['origin_geom']),
+                'properties': {}
+            }
+            resp['features'].append(feature)
+            feature = {
+                'type': 'Feature',
+                'geometry': json.loads(row['dest_geom']),
+                'properties': {}
+            }
+            resp['features'].append(feature)
+    r = make_response(json.dumps(resp, sort_keys=False, default=dthandler))
+    r.headers['Content-Type'] = 'application/json'
+    return r
+
 @geo.route('/<geo_type>/')
 def geo_type(geo_type):
     ''' 
