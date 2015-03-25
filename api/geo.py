@@ -29,8 +29,7 @@ def vectors(geoid):
     char_table_name = '{0}_{1}_{2}'.format(char_type, year, job_type)
     sel = """ 
         SELECT 
-            j.*,
-            ST_AsGeoJSON(ST_ShortestLine(ST_Centroid(b.geom), ST_Centroid(c.geom))) as line,
+            ST_AsGeoJSON(ST_ShortestLine(b.geom, c.geom)) as line,
             ST_AsGeoJSON(c.geom) AS origin_geom,
             c.geoid10 as origin_geocode,
             ST_AsGeoJSON(b.geom) AS dest_geom
@@ -44,8 +43,6 @@ def vectors(geoid):
         {0} AS o 
         JOIN census_blocks AS b 
             ON o.h_geocode = b.geoid10
-        JOIN {1} as j
-            ON o.h_geocode = j.geocode
         WHERE h_geocode = :geoid
     """.format(table_name, char_table_name)
     resp = {
@@ -79,6 +76,62 @@ def vectors(geoid):
     r = make_response(json.dumps(resp, sort_keys=False, default=dthandler))
     r.headers['Content-Type'] = 'application/json'
     return r
+
+@geo.route('/average-vector/<geoid>/')
+def average_vector(geoid):
+    char_type = request.args.get('char_type', 'res_area')
+    year = request.args.get('year', '2011')
+    job_type = request.args.get('job_type', 'jt00')
+    char_type = request.args.get('char_type', 'res_area')
+    table_name = 'origin_dest_{0}_{1}'.format(year, job_type)
+    char_table_name = '{0}_{1}_{2}'.format(char_type, year, job_type)
+    sel = '''
+      select 
+        st_asgeojson(
+          st_shortestline(
+            st_setsrid(
+              st_point(
+                sum(
+                  st_x(
+                    st_centroid(work.geom)
+                  ) * work.workers
+                ) / sum(work.workers), 
+                sum(
+                  st_y(
+                    st_centroid(work.geom)
+                  ) * work.workers
+                ) / sum(work.workers)
+              ), 4326),
+            st_centroid(home.geom) 
+          )
+        ) as vector 
+      from census_blocks as home, (
+        select 
+          census_blocks.geom,
+          sum(w.s000) as workers
+        from census_blocks
+        join {0} as w
+          on census_blocks.geoid10 = w.w_geocode
+        where h_geocode = :geoid
+        group by census_blocks.geom
+      ) as work 
+      where home.geoid10 = :geoid
+      group by home.geom
+    '''.format(table_name)
+    resp = {
+        "type": "FeatureCollection",
+        "features": []
+    }
+    with engine.begin() as conn:
+        rows = [dict(zip(r.keys(), r.values())) for r in conn.execute(text(sel), geoid=geoid)]
+        for row in rows:
+            feature = {
+                'type': 'Feature',
+                'geometry': json.loads(row['vector']),
+                'properties': {}
+            }
+            resp['features'].append(feature)
+    return make_response(json.dumps(resp))
 
 @geo.route('/<geo_type>/')
 def geo_type(geo_type):

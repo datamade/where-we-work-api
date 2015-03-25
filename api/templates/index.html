@@ -119,12 +119,9 @@
                 if (typeof geoid === 'undefined'){
                     geoid = e.data.geoid10
                 }
-                $.when(getGeoJSON(geo_type, geoid)).then(
+                $.when(getVectorJSON(geoid)).then(
                     function(data){
-                        var geo = L.geoJson(data, {
-                            style: styleShape,
-                            onEachFeature: onEach
-                        });
+                        var geo = L.geoJson(data);
                         shapeGroup.clearLayers();
                         shapeGroup.addLayer(geo);
                         map.fitBounds(geo.getBounds());
@@ -207,6 +204,11 @@
         var data = {'groups': groups, 'meta': meta}
         $('#info').html(tpl.render(data));
         $('.collapse').collapse()
+    }
+
+    function getVectorJSON(geoid){
+        var url = '/api/geo/average-vector/' + geoid + '/'
+        return $.getJSON(url)
     }
 
     function getGeoJSON(geo_type, fips, year){

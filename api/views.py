@@ -7,3 +7,7 @@ views = Blueprint('views', __name__)
 @views.route('/')
 def index():
     return render_template('index.html')
+
+@views.route('/vectors/<geoid>/')
+def vectors(geoid):
+    return render_template('vectors.html', geoid=geoid)
