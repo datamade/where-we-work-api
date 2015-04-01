@@ -103,6 +103,15 @@
             'Counties': county_grids
         }
         var layer_control = L.control.layers({}, tileLayers, {collapsed: false, autoZIndex: true}).addTo(map);
+        $.when(getVectorJSON()).then(
+            function(data){
+                var geo = L.geoJson(data);
+                shapeGroup.clearLayers();
+                shapeGroup.addLayer(geo);
+                map.fitBounds(geo.getBounds());
+                shapeGroup.addTo(map);
+            }
+        )
         map.on('overlayadd', function(e){
             var grid = gridLayers[e.name];
             if (e.name == 'Counties'){
@@ -119,15 +128,6 @@
                 if (typeof geoid === 'undefined'){
                     geoid = e.data.geoid10
                 }
-                $.when(getVectorJSON(geoid)).then(
-                    function(data){
-                        var geo = L.geoJson(data);
-                        shapeGroup.clearLayers();
-                        shapeGroup.addLayer(geo);
-                        map.fitBounds(geo.getBounds());
-                        shapeGroup.addTo(map);
-                    }
-                )
             });
             this.addLayer(grid);
         });
@@ -207,7 +207,7 @@
     }
 
     function getVectorJSON(geoid){
-        var url = '/api/geo/average-vector/' + geoid + '/'
+        var url = '/api/geo/average-vector/'
         return $.getJSON(url)
     }
 

@@ -77,8 +77,8 @@ def vectors(geoid):
     r.headers['Content-Type'] = 'application/json'
     return r
 
-@geo.route('/average-vector/<geoid>/')
-def average_vector(geoid):
+@geo.route('/average-vector/')
+def average_vector():
     char_type = request.args.get('char_type', 'res_area')
     year = request.args.get('year', '2011')
     job_type = request.args.get('job_type', 'jt00')
@@ -86,44 +86,28 @@ def average_vector(geoid):
     table_name = 'origin_dest_{0}_{1}'.format(year, job_type)
     char_table_name = '{0}_{1}_{2}'.format(char_type, year, job_type)
     sel = '''
-      select 
-        st_asgeojson(
-          st_shortestline(
-            st_setsrid(
-              st_point(
-                sum(
-                  st_x(
-                    st_centroid(work.geom)
-                  ) * work.workers
-                ) / sum(work.workers), 
-                sum(
-                  st_y(
-                    st_centroid(work.geom)
-                  ) * work.workers
-                ) / sum(work.workers)
-              ), 4326),
-            st_centroid(home.geom) 
-          )
-        ) as vector 
-      from census_blocks as home, (
         select 
-          census_blocks.geom,
-          sum(w.s000) as workers
-        from census_blocks
-        join {0} as w
-          on census_blocks.geoid10 = w.w_geocode
-        where h_geocode = :geoid
-        group by census_blocks.geom
-      ) as work 
-      where home.geoid10 = :geoid
-      group by home.geom
-    '''.format(table_name)
+          st_asgeojson(
+            st_shortestline(
+              st_centroid(home.geom), 
+              st_setsrid(
+                st_point(
+                  ((home.center_x - work.work_center_x) / 10 + home.center_x), 
+                  ((home.center_y - work.work_center_y) / 10 + home.center_y)
+                ), 4326) 
+            )) as vector 
+        from census_blocks as home 
+        join center_of_work_2011 as work 
+          on home.geoid10 = work.home_geo10
+        order by random()
+        limit 10000
+    '''
     resp = {
         "type": "FeatureCollection",
         "features": []
     }
     with engine.begin() as conn:
-        rows = [dict(zip(r.keys(), r.values())) for r in conn.execute(text(sel), geoid=geoid)]
+        rows = [dict(zip(r.keys(), r.values())) for r in conn.execute(text(sel))]
         for row in rows:
             feature = {
                 'type': 'Feature',
