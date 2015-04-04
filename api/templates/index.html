@@ -9,12 +9,9 @@
 </style>
 {% endblock %}
 {% block content %}
-<div class="row">
-    <div class="col-sm-8">
+    <div class="col-sm-12">
         <div id="map-canvas"></div>
     </div>
-    <div id="info" class="col-sm-4"></div>
-</div>
 {% endblock %}
 {% block extra_javascript %}
 <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
@@ -82,59 +79,26 @@
             zoom: 9,
             scrollWheelZoom: false
         });
-        L.tileLayer('http://{s}.tile.stamen.com/toner/{z}/{x}/{y}.png',{
+        L.tileLayer('https://{s}.tiles.mapbox.com/v3/ericvanzanten.map-3ofkoxuh/{z}/{x}/{y}.png',{
             attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
             detectRetina: true
         }).addTo(map);
-        var blocks_tiles = L.tileLayer(tiles_endpoint + '/census-blocks/{z}/{x}/{y}.png');
-        var blocks_grids = new L.UtfGrid(tiles_endpoint + '/census-blocks-grid/{z}/{x}/{y}.json?callback={cb}', {});
-        var tracts_tiles = L.tileLayer(tiles_endpoint + '/census-tracts/{z}/{x}/{y}.png');
-        var tracts_grids = new L.UtfGrid(tiles_endpoint + '/census-tracts-grid/{z}/{x}/{y}.json?callback={cb}', {});
-        var county_tiles = L.tileLayer(tiles_endpoint + '/counties/{z}/{x}/{y}.png');
-        var county_grids = new L.UtfGrid(tiles_endpoint + '/counties-grid/{z}/{x}/{y}.json?callback={cb}', {});
+        var vector_tiles = L.tileLayer(tiles_endpoint + '/vectors-2011/{z}/{x}/{y}.png');
+        var vector_tiles_lines = L.tileLayer(tiles_endpoint + '/vectors-2011-lines/{z}/{x}/{y}.png');
         var tileLayers = {
-            'Census blocks': blocks_tiles,
-            'Census tracts': tracts_tiles,
-            'Counties': county_tiles
+            'Vector direction': vector_tiles,
+            'All vectors': vector_tiles_lines,
         }
-        var gridLayers = {
-            'Census blocks': blocks_grids,
-            'Census tracts': tracts_grids,
-            'Counties': county_grids
-        }
-        var layer_control = L.control.layers({}, tileLayers, {collapsed: false, autoZIndex: true}).addTo(map);
-        $.when(getVectorJSON()).then(
-            function(data){
-                var geo = L.geoJson(data);
-                shapeGroup.clearLayers();
-                shapeGroup.addLayer(geo);
-                map.fitBounds(geo.getBounds());
-                shapeGroup.addTo(map);
-            }
-        )
-        map.on('overlayadd', function(e){
-            var grid = gridLayers[e.name];
-            if (e.name == 'Counties'){
-                geo_type = 'county'
-            }
-            else if (e.name == 'Census blocks'){
-                geo_type = 'block'
-            }
-            else if (e.name == 'Census tracts'){
-                geo_type = 'tract'
-            }
-            grid.on('click', function(e){
-                var geoid = e.data.geoid;
-                if (typeof geoid === 'undefined'){
-                    geoid = e.data.geoid10
-                }
-            });
-            this.addLayer(grid);
-        });
-        map.on('overlayremove', function(e){
-            shapeGroup.clearLayers();
-            map.removeLayer(gridLayers[e.name]);
-        })
+        var layer_control = L.control.layers({}, tileLayers, {collapsed: false, autoZIndex: false}).addTo(map);
+      //$.when(getVectorJSON()).then(
+      //    function(data){
+      //        var geo = L.geoJson(data);
+      //        shapeGroup.clearLayers();
+      //        shapeGroup.addLayer(geo);
+      //        map.fitBounds(geo.getBounds());
+      //        shapeGroup.addTo(map);
+      //    }
+      //)
     });
     function styleShape(feature){
         return {

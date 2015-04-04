@@ -99,8 +99,6 @@ def average_vector():
         from census_blocks as home 
         join center_of_work_2011 as work 
           on home.geoid10 = work.home_geo10
-        order by random()
-        limit 10000
     '''
     resp = {
         "type": "FeatureCollection",
