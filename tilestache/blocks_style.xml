@@ -15,8 +15,8 @@
     <Datasource>
       <Parameter name="type">postgis</Parameter>
       <Parameter name="host">127.0.0.1</Parameter>
-      <Parameter name="port">5433</Parameter>
-      <Parameter name="user">postgres</Parameter>
+      <Parameter name="port">5432</Parameter>
+      <Parameter name="user">eric</Parameter>
       <Parameter name="dbname">lodes</Parameter>
       <Parameter name="table">census_blocks</Parameter>
     </Datasource>
