@@ -91,6 +91,6 @@ if __name__ == "__main__":
         print f
     states = ['il', 'wi', 'in']
     for state in states:
-        for year in range(2002, 2012):
+        for year in range(2011, 2014):
             for full_path, url in iter_parts(year, state):
                 print fetch(full_path, url)

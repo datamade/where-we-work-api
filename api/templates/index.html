@@ -10,7 +10,15 @@
 {% endblock %}
 {% block content %}
     <div class="col-sm-12">
+        <div>
+            <select id="year-picker">
+                <option value="2011">2011</option>
+                <option value="2012">2012</option>
+                <option value="2013">2013</option>
+            </select>
+        </div>
         <div id="map-canvas"></div>
+        <div id="info"></div>
     </div>
 {% endblock %}
 {% block extra_javascript %}
@@ -80,25 +88,90 @@
             scrollWheelZoom: false
         });
         L.tileLayer('https://{s}.tiles.mapbox.com/v3/ericvanzanten.map-3ofkoxuh/{z}/{x}/{y}.png',{
-            attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
-            detectRetina: true
+            attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
         }).addTo(map);
-        var vector_tiles = L.tileLayer(tiles_endpoint + '/vectors-2011/{z}/{x}/{y}.png');
-        var vector_tiles_lines = L.tileLayer(tiles_endpoint + '/vectors-2011-lines/{z}/{x}/{y}.png');
+
+        var blocks_tiles = L.tileLayer(tiles_endpoint + '/census-blocks/{z}/{x}/{y}.png');
+        var blocks_grids = new L.UtfGrid(tiles_endpoint + '/census-blocks-grid/{z}/{x}/{y}.json?callback={cb}', {});
+        var tracts_tiles = L.tileLayer(tiles_endpoint + '/census-tracts/{z}/{x}/{y}.png');
+        var tracts_grids = new L.UtfGrid(tiles_endpoint + '/census-tracts-grid/{z}/{x}/{y}.json?callback={cb}', {});
+        var county_tiles = L.tileLayer(tiles_endpoint + '/counties/{z}/{x}/{y}.png');
+        var county_grids = new L.UtfGrid(tiles_endpoint + '/counties-grid/{z}/{x}/{y}.json?callback={cb}', {});
+
+        var vector_tiles_2011 = L.tileLayer(tiles_endpoint + '/vectors-2011/{z}/{x}/{y}.png');
+        var vector_lines_2011 = L.tileLayer(tiles_endpoint + '/vectors-2011-lines/{z}/{x}/{y}.png');
+
+        var vector_tiles_2012 = L.tileLayer(tiles_endpoint + '/vectors-2012/{z}/{x}/{y}.png');
+        var vector_lines_2012 = L.tileLayer(tiles_endpoint + '/vectors-2012-lines/{z}/{x}/{y}.png');
+
+        var vector_tiles_2013 = L.tileLayer(tiles_endpoint + '/vectors-2013/{z}/{x}/{y}.png');
+        var vector_lines_2013 = L.tileLayer(tiles_endpoint + '/vectors-2013-lines/{z}/{x}/{y}.png');
+
         var tileLayers = {
-            'Vector direction': vector_tiles,
-            'All vectors': vector_tiles_lines,
+            'Vector direction 2011': vector_tiles_2011,
+            'Vector lines 2011': vector_lines_2011,
+            'Vector direction 2012': vector_tiles_2012,
+            'Vector lines 2012': vector_lines_2012,
+            'Vector direction 2013': vector_tiles_2013,
+            'Vector lines 2013': vector_lines_2013,
+            'Census blocks': blocks_tiles,
+            'Census tracts': tracts_tiles,
+            'Counties': county_tiles
         }
+        var gridLayers = {
+            'Census blocks': blocks_grids,
+            'Census tracts': tracts_grids,
+            'Counties': county_grids
+        }
+
         var layer_control = L.control.layers({}, tileLayers, {collapsed: false, autoZIndex: false}).addTo(map);
-      //$.when(getVectorJSON()).then(
-      //    function(data){
-      //        var geo = L.geoJson(data);
-      //        shapeGroup.clearLayers();
-      //        shapeGroup.addLayer(geo);
-      //        map.fitBounds(geo.getBounds());
-      //        shapeGroup.addTo(map);
-      //    }
-      //)
+
+        map.on('overlayadd', function(e){
+            var grid = gridLayers[e.name];
+            if (e.name == 'Counties'){
+                geo_type = 'county'
+            }
+            else if (e.name == 'Census blocks'){
+                geo_type = 'block'
+            }
+            else if (e.name == 'Census tracts'){
+                geo_type = 'tract'
+            }
+            grid.on('click', function(e){
+                var geoid = e.data.geoid;
+                if (typeof geoid === 'undefined'){
+                    geoid = e.data.geoid10
+                }
+                $.when(getGeoJSON(geo_type, geoid)).then(
+                    function(data){
+                        var geo = L.geoJson(data, {
+                            style: styleShape,
+                            onEachFeature: onEach
+                        });
+                        shapeGroup.clearLayers();
+                        shapeGroup.addLayer(geo);
+                        map.fitBounds(geo.getBounds());
+                        shapeGroup.addTo(map);
+                    }
+                )
+            });
+            this.addLayer(grid);
+        });
+
+        map.on('overlayremove', function(e){
+            shapeGroup.clearLayers();
+            map.removeLayer(gridLayers[e.name]);
+        })
+
+        //$.when(getGeoJSON()).then(
+        //    function(data){
+        //        var geo = L.geoJson(data);
+        //        shapeGroup.clearLayers();
+        //        shapeGroup.addLayer(geo);
+        //        map.fitBounds(geo.getBounds());
+        //        shapeGroup.addTo(map);
+        //    }
+        //)
     });
     function styleShape(feature){
         return {
@@ -112,23 +185,23 @@
 
     function onEach(feature, layer){
         var geoid = feature.properties[geo_type]
-        $.when(getConnected(geoid, geo_type)).then(
-            function(data){
-                connectedGroup.clearLayers()
-                $.each(data.objects, function(i, obj){
-                    $.each(obj.counts, function(fips, count){
-                        if(COUNTIES.indexOf(fips.slice(0, 5)) >= 0){
-                            $.when(getGeoJSON(geo_type, fips)).then(
-                                function(data){
-                                    connectedGroup.addLayer(L.geoJson(data));
-                                }
-                            )
-                        }
-                    })
-                })
-                connectedGroup.addTo(map);
-            }
-        )
+        // $.when(getConnected(geoid, geo_type)).then(
+        //     function(data){
+        //         connectedGroup.clearLayers()
+        //         $.each(data.objects, function(i, obj){
+        //             $.each(obj.counts, function(fips, count){
+        //                 if(COUNTIES.indexOf(fips.slice(0, 5)) >= 0){
+        //                     $.when(getGeoJSON(geo_type, fips)).then(
+        //                         function(data){
+        //                             connectedGroup.addLayer(L.geoJson(data));
+        //                         }
+        //                     )
+        //                 }
+        //             })
+        //         })
+        //         connectedGroup.addTo(map);
+        //     }
+        // )
         updateInfo(feature.properties)
     }
 
@@ -175,9 +248,10 @@
         return $.getJSON(url)
     }
 
-    function getGeoJSON(geo_type, fips, year){
+    function getGeoJSON(geo_type, fips){
         var url = '/api/geo'
         var params = {}
+        var year = $('#year-picker').val();
         if (typeof geo_type == 'undefined'){
             url += '/county/';
         } else {

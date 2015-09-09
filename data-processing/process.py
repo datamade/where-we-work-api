@@ -31,7 +31,7 @@ COUNTIES = [
 DB_USER = 'postgres'
 DB_HOST = '127.0.0.1'
 DB_NAME = 'lodes'
-DB_PORT = '5433'
+DB_PORT = '5432'
 DB_CONN_STR = 'host={0} dbname={1} user={2} port={3}'\
     .format(DB_HOST, DB_NAME, DB_USER, DB_PORT)
 
@@ -52,7 +52,7 @@ def create_tables():
     counter = 0
     with psycopg2.connect(DB_CONN_STR) as conn:
         with conn.cursor() as curs:
-            for year in range(2002,2012):
+            for year in range(2002,2014):
                 for jt in range(6):
                     job_type = 'jt{0}'.format(str(jt).zfill(2))
                     curs.execute(OD_CREATE.format(year, job_type))
@@ -72,8 +72,8 @@ def iterfiles(params, dirname, names):
         fpath = os.path.join(dirname, name)
         if os.path.isfile(fpath) and fpath.endswith('.gz'):
             load_area(fpath)
-        elif os.path.isfile(fpath) and fpath.endswith('.zip'):
-            load_shapes(fpath)
+        # elif os.path.isfile(fpath) and fpath.endswith('.zip'):
+        #     load_shapes(fpath)
         else:
             print "I don't know what to do with {0}".format(fpath)
 
@@ -207,7 +207,7 @@ def load_area(fpath):
     return None
 
 def indexes(create=True):
-    for year in range(2002,2012):
+    for year in range(2002,2014):
         for jt in range(6):
             with psycopg2.connect(DB_CONN_STR) as conn:
                 with conn.cursor() as curs:
@@ -250,7 +250,7 @@ def create_views():
                 t = 'jobs'
             else:
                 t = 'workers'
-            for year in range(2002, 2012):
+            for year in range(2002, 2014):
                 stats_view_name = '{0}_by_{1}_{2}'.format(t, geography, year)
                 od_view_name = 'connected_{0}_{1}_{2}'.format(t, geography, year)
                 stats_fmt_args = geo_range + [geography, char_type, year]

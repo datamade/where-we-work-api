@@ -21,7 +21,7 @@
       <Parameter name="port">5432</Parameter>
       <Parameter name="user">postgres</Parameter>
       <Parameter name="dbname">lodes</Parameter>
-      <Parameter name="table">average_vector_2011</Parameter>
+      <Parameter name="table">average_vector_2013</Parameter>
     </Datasource>
 </Layer>
 

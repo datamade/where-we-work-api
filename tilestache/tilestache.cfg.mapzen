@@ -1,0 +1,100 @@
+{
+    "cache": {
+        "name": "Test",
+        "path": "cache",
+        "umask": "0000",
+        "dirs": "quadtile",
+        "gzip": ["txt", "text", "json", "xml", "topojson", "geojson", "oscimap"]
+    },
+    "layers": {
+        "all": {
+          "allowed origin": "*",
+          "provider": {
+            "class": "TileStache.Goodies.VecTiles:MultiProvider",
+            "kwargs": {
+              "names": [
+                "lines",
+                "arrows"
+              ],
+              "ignore_cached_sublayers": true
+            }
+          }
+        },
+        "lines": {
+          "allowed origin": "*",
+          "provider": {
+            "class": "TileStache.Goodies.VecTiles:Provider",
+            "kwargs": {
+              "dbinfo": {
+                "host": "localhost",
+                "port": 5432,
+                "user": "osm",
+                "database": "osm"
+              },
+              "queries": [
+                null, null, null, null, null, null, null, 
+                "queries/roads-z7.pgsql",
+                "queries/roads-z7.pgsql",
+                "queries/roads-z7.pgsql",
+                "queries/roads-z10.pgsql",
+                "queries/roads-z11.pgsql",
+                "queries/roads-z12.pgsql",
+                "queries/roads-z13.pgsql",
+                "queries/roads-z14.pgsql",
+                "queries/roads-z15.pgsql"
+              ],
+              "geometry_types": ["LineString", "MultiLineString"],
+              "transform_fns": [
+                "TileStache.Goodies.VecTiles.transform.add_id_to_properties",
+                "TileStache.Goodies.VecTiles.transform.detect_osm_relation",
+                "TileStache.Goodies.VecTiles.transform.road_kind",
+                "TileStache.Goodies.VecTiles.transform.road_classifier",
+                "TileStache.Goodies.VecTiles.transform.road_sort_key",
+                "TileStache.Goodies.VecTiles.transform.road_oneway",
+                "TileStache.Goodies.VecTiles.transform.road_trim_properties",
+                "TileStache.Goodies.VecTiles.transform.remove_feature_id"
+              ],
+              "sort_fn": "TileStache.Goodies.VecTiles.sort.roads"
+            }
+          }
+        },
+        "arrows": {
+          "allowed origin": "*",
+          "provider": {
+            "class": "TileStache.Goodies.VecTiles:Provider",
+            "kwargs": {
+              "dbinfo": {
+                "host": "localhost",
+                "port": 5432,
+                "user": "osm",
+                "database": "osm"
+              },
+              "queries": [
+                null, null, null, null, null, null, null, 
+                "queries/roads-z7.pgsql",
+                "queries/roads-z7.pgsql",
+                "queries/roads-z7.pgsql",
+                "queries/roads-z10.pgsql",
+                "queries/roads-z11.pgsql",
+                "queries/roads-z12.pgsql",
+                "queries/roads-z13.pgsql",
+                "queries/roads-z14.pgsql",
+                "queries/roads-z15.pgsql"
+              ],
+              "geometry_types": ["LineString", "MultiLineString"],
+              "transform_fns": [
+                "TileStache.Goodies.VecTiles.transform.add_id_to_properties",
+                "TileStache.Goodies.VecTiles.transform.detect_osm_relation",
+                "TileStache.Goodies.VecTiles.transform.road_kind",
+                "TileStache.Goodies.VecTiles.transform.road_classifier",
+                "TileStache.Goodies.VecTiles.transform.road_sort_key",
+                "TileStache.Goodies.VecTiles.transform.road_oneway",
+                "TileStache.Goodies.VecTiles.transform.road_trim_properties",
+                "TileStache.Goodies.VecTiles.transform.remove_feature_id"
+              ],
+              "sort_fn": "TileStache.Goodies.VecTiles.sort.roads"
+            }
+          }
+        }
+    }
+}
